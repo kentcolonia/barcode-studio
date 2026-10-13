@@ -1,0 +1,6 @@
+data/
+deploy/
+install.sh
+*.zip
+__pycache__/
+.git

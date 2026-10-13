@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Barcode Studio</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f5f6f8;--card:#fff;--text:#1a1d23;--muted:#6b7280;--line:#e2e5ea;--accent:#2563eb;--ok:#15803d;--bad:#b91c1c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1115;--card:#181b21;--text:#eceef2;--muted:#9aa1ad;--line:#2a2f38;--accent:#5b8cff;--ok:#4ade80;--bad:#f87171}}
+:root[data-theme="dark"]{--bg:#0f1115;--card:#181b21;--text:#eceef2;--muted:#9aa1ad;--line:#2a2f38;--accent:#5b8cff;--ok:#4ade80;--bad:#f87171}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1{font-size:1.3rem;margin:4px 0 14px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{flex:1;padding:10px;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:10px;font-size:.95rem;cursor:pointer}
+.tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+label{display:block;font-size:.8rem;color:var(--muted);margin:10px 0 4px}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:1rem}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:140px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.btn{padding:10px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;font-size:.9rem}
+.btn.p{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.d{color:var(--bad)}
+.preview{text-align:center;padding:14px;background:#fff;border-radius:10px;margin-top:14px;overflow-x:auto;min-height:60px}
+.preview svg{max-width:100%;height:auto}
+.msg{font-size:.85rem;margin-top:8px;min-height:1.2em}.msg.bad{color:var(--bad)}.msg.ok{color:var(--ok)}
+.item{display:flex;gap:12px;align-items:center;border-top:1px solid var(--line);padding:12px 0;flex-wrap:wrap}
+.item:first-child{border-top:0}
+.item .bc{background:#fff;border-radius:8px;padding:6px;flex:0 0 auto;max-width:100%;overflow:hidden}
+.item .bc svg{display:block;max-width:100%;height:auto}
+.meta{flex:1;min-width:120px;font-size:.85rem;color:var(--muted)}
+.meta b{color:var(--text);display:block;font-size:.95rem;word-break:break-all}
+#reader{width:100%;max-width:420px;margin:12px auto 0}
+.result{font-family:ui-monospace,Menlo,monospace;word-break:break-all;background:var(--bg);padding:10px;border-radius:8px;margin-top:10px}
+.hidden{display:none}
+#printArea{display:none}
+@media print{
+ body>main{display:none}
+ #printArea{display:block}
+ #printArea .pi{page-break-inside:avoid;text-align:center;margin:0 0 18px;color:#000}
+ #printArea svg{max-width:100%}
+}
+</style>
+</head>
+<body>
+<main>
+<h1>Barcode Studio</h1>
+<div class="tabs">
+ <button id="t-gen" class="on" onclick="tab('gen')">Create</button>
+ <button id="t-saved" onclick="tab('saved')">Saved (<span id="cnt">0</span>)</button>
+ <button id="t-scan" onclick="tab('scan')">Scan</button>
+</div>
+
+<section id="v-gen">
+ <div class="card">
+  <div class="row">
+   <div><label for="fmt">Format</label>
+    <select id="fmt">
+     <option value="CODE128">Code 128 (any text)</option>
+     <option value="CODE39">Code 39</option>
+     <option value="EAN13">EAN-13 (12–13 digits)</option>
+     <option value="EAN8">EAN-8 (7–8 digits)</option>
+     <option value="UPC">UPC-A (11–12 digits)</option>
+     <option value="ITF">ITF (even digits)</option>
+    </select></div>
+   <div><label for="lbl">Label (optional)</label><input id="lbl" placeholder="e.g. Shelf A-12"></div>
+  </div>
+  <label for="val">Barcode value</label>
+  <input id="val" placeholder="Enter text or numbers" autocomplete="off">
+  <div class="btns">
+   <button class="btn p" onclick="generate()">Generate</button>
+   <button class="btn" onclick="saveCurrent()">Save</button>
+   <button class="btn" onclick="printCurrent()">Print</button>
+   <button class="btn" onclick="randomVal()">Random</button>
+  </div>
+  <div id="gmsg" class="msg"></div>
+  <div class="preview" id="preview"><svg id="bc"></svg></div>
+ </div>
+</section>
+
+<section id="v-saved" class="hidden">
+ <div class="card">
+  <div class="btns" style="margin:0 0 6px">
+   <button class="btn p" onclick="printAll()">Print all</button>
+   <button class="btn d" onclick="clearAll()">Clear all</button>
+  </div>
+  <div id="list"></div>
+ </div>
+</section>
+
+<section id="v-scan" class="hidden">
+ <div class="card">
+  <label for="kb">Hardware scanner / keyboard input (focus here and scan, then Enter)</label>
+  <input id="kb" placeholder="Scan with USB scanner…" autocomplete="off">
+  <div class="btns">
+   <button class="btn p" id="camBtn" onclick="toggleCam()">Start camera</button>
+   <label class="btn" style="margin:0;color:var(--text)">Scan image file<input type="file" accept="image/*" id="file" class="hidden"></label>
+  </div>
+  <div id="reader"></div>
+  <div id="smsg" class="msg"></div>
+  <div id="sres" class="hidden">
+   <div class="result" id="sval"></div>
+   <div id="smatch" class="msg"></div>
+   <div class="btns">
+    <button class="btn" onclick="useScanned()">Use in Create</button>
+    <button class="btn p" onclick="saveScanned()">Save scanned</button>
+   </div>
+  </div>
+ </div>
+</section>
+</main>
+<div id="printArea"></div>
+
+<script src="/static/vendor/JsBarcode.all.min.js"></script>
+<script src="/static/vendor/html5-qrcode.min.js"></script>
+<script>
+let saved=[],scanner=null,camOn=false,lastScan='';
+const $=id=>document.getElementById(id);
+async function api(method,url,body){
+ const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,credentials:'same-origin'});
+ if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||('HTTP '+r.status));
+ return r.json();
+}
+async function load(){try{saved=await api('GET','/api/barcodes')}catch(e){saved=[];msg('gmsg','Could not load saved barcodes: '+e.message,1)}updateCount()}
+async function addBarcode(b){const row=await api('POST','/api/barcodes',b);saved.unshift(row);updateCount()}
+function msg(id,t,bad){const e=$(id);e.textContent=t;e.className='msg '+(bad?'bad':'ok')}
+
+function tab(n){
+ ['gen','saved','scan'].forEach(x=>{$('v-'+x).classList.toggle('hidden',x!==n);$('t-'+x).classList.toggle('on',x===n)});
+ if(n==='saved')load().then(renderList);
+ if(n!=='scan'&&camOn)toggleCam();
+}
+
+function draw(svg,value,format,opts){
+ let ok=true;
+ JsBarcode(svg,value,Object.assign({format,width:2,height:80,displayValue:true,margin:8,valid:v=>{ok=v}},opts||{}));
+ return ok;
+}
+function generate(){
+ const v=$('val').value.trim(),f=$('fmt').value;
+ if(!v){msg('gmsg','Enter a value first.',1);return false}
+ try{
+  const ok=draw($('bc'),v,f);
+  if(!ok){msg('gmsg','Value is not valid for '+f+'.',1);$('bc').innerHTML='';return false}
+  msg('gmsg','Barcode generated.');return true;
+ }catch(e){msg('gmsg','Value is not valid for '+f+'.',1);$('bc').innerHTML='';return false}
+}
+function randomVal(){
+ const f=$('fmt').value;const d=n=>Array.from({length:n},()=>Math.floor(Math.random()*10)).join('');
+ $('val').value=f==='EAN13'?d(12):f==='EAN8'?d(7):f==='UPC'?d(11):f==='ITF'?d(12):f==='CODE39'?'ITEM'+d(5):'BC-'+d(8);
+ generate();
+}
+async function saveCurrent(){
+ if(!generate())return;
+ try{await addBarcode({value:$('val').value.trim(),format:$('fmt').value,label:$('lbl').value.trim()});msg('gmsg','Saved to the server.')}
+ catch(e){msg('gmsg','Save failed: '+e.message,1)}
+}
+function updateCount(){$('cnt').textContent=saved.length}
+
+function renderList(){
+ const L=$('list');L.innerHTML='';
+ if(!saved.length){L.innerHTML='<p style="color:var(--muted)">No saved barcodes yet. Create one and tap Save.</p>';return}
+ saved.forEach(b=>{
+  const d=document.createElement('div');d.className='item';
+  d.innerHTML='<div class="bc"><svg></svg></div><div class="meta"><b></b><span></span></div><div class="btns" style="margin:0"><button class="btn">Print</button><button class="btn d">Delete</button></div>';
+  try{draw(d.querySelector('svg'),b.value,b.format,{height:50,width:1.5,fontSize:12})}catch(e){}
+  d.querySelector('b').textContent=b.label||b.value;
+  d.querySelector('span').textContent=b.format+' · '+new Date(b.created).toLocaleString();
+  const [pb,db]=d.querySelectorAll('.btn');
+  pb.onclick=()=>printItems([b]);
+  db.onclick=async()=>{try{await api('DELETE','/api/barcodes/'+b.id);saved=saved.filter(x=>x.id!==b.id);updateCount();renderList()}catch(e){alert('Delete failed: '+e.message)}};
+  L.appendChild(d);
+ });
+}
+async function clearAll(){if(saved.length&&confirm('Delete all saved barcodes?')){try{await api('DELETE','/api/barcodes');saved=[];updateCount();renderList()}catch(e){alert('Failed: '+e.message)}}}
+
+function printItems(items){
+ const P=$('printArea');P.innerHTML='';
+ items.forEach(b=>{
+  const w=document.createElement('div');w.className='pi';
+  if(b.label){const t=document.createElement('div');t.textContent=b.label;t.style.cssText='font:600 14px sans-serif;margin-bottom:4px';w.appendChild(t)}
+  const s=document.createElementNS('http://www.w3.org/2000/svg','svg');w.appendChild(s);
+  try{draw(s,b.value,b.format,{background:'#fff',lineColor:'#000'})}catch(e){}
+  P.appendChild(w);
+ });
+ setTimeout(()=>window.print(),100);
+}
+function printCurrent(){
+ if(!generate())return;
+ printItems([{value:$('val').value.trim(),format:$('fmt').value,label:$('lbl').value.trim()}]);
+}
+function printAll(){if(saved.length)printItems(saved)}
+
+/* Scanning */
+function showScan(text,fmt){
+ lastScan=text;$('sres').classList.remove('hidden');
+ $('sval').textContent=text+(fmt?'  ('+fmt+')':'');
+ const m=saved.find(b=>b.value===text);
+ const e=$('smatch');
+ e.textContent=m?'✓ Match found in your saved list'+(m.label?': '+m.label:'')+'.':'Not in your saved list.';
+ e.className='msg '+(m?'ok':'bad');
+}
+async function toggleCam(){
+ if(camOn){try{await scanner.stop();scanner.clear()}catch(e){}camOn=false;$('camBtn').textContent='Start camera';return}
+ if(!window.isSecureContext){msg('smsg','Camera needs HTTPS (or localhost). Use the file option or a hardware scanner.',1);return}
+ try{
+  scanner=new Html5Qrcode('reader');
+  await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:260,height:140}},
+   (t,r)=>{showScan(t,r&&r.result&&r.result.format&&r.result.format.formatName);msg('smsg','Scanned!')},()=>{});
+  camOn=true;$('camBtn').textContent='Stop camera';msg('smsg','Point the camera at a barcode.');
+ }catch(e){msg('smsg','Camera unavailable or permission denied. Try the file option or a hardware scanner.',1)}
+}
+$('file').onchange=async ev=>{
+ const f=ev.target.files[0];if(!f)return;
+ try{
+  if(camOn)await toggleCam();
+  const s=new Html5Qrcode('reader');
+  const r=await s.scanFile(f,false);showScan(r);msg('smsg','Scanned from image.');s.clear();
+ }catch(e){msg('smsg','No barcode found in that image.',1)}
+ ev.target.value='';
+};
+$('kb').addEventListener('keydown',e=>{
+ if(e.key==='Enter'&&e.target.value.trim()){showScan(e.target.value.trim());msg('smsg','Scanned from device.');e.target.value=''}
+});
+function useScanned(){$('val').value=lastScan;tab('gen');generate()}
+async function saveScanned(){
+ if(!lastScan)return;
+ try{await addBarcode({value:lastScan,format:'CODE128',label:'Scanned'});msg('smsg','Saved to the server (as Code 128).');showScan(lastScan)}
+ catch(e){msg('smsg','Save failed: '+e.message,1)}
+}
+
+$('val').addEventListener('keydown',e=>{if(e.key==='Enter')generate()});
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+# Portainer stack for Barcode Studio
+services:
+  barcode-studio:
+    build: .                      # builds from the Dockerfile in this folder
+    image: barcode-studio:latest
+    container_name: barcode-studio
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8000}:8000"
+    environment:
+      APP_USER: ${APP_USER:-admin}
+      APP_PASSWORD: ${APP_PASSWORD:?set APP_PASSWORD in the stack environment variables}
+      BARCODE_DB: /data/barcodes.db
+    volumes:
+      - barcode_data:/data        # saved barcodes persist here
+
+volumes:
+  barcode_data:
